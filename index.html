@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LiteChat</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f0f2f5; height: 100vh; display: flex; align-items: center; justify-content: center; }
+
+/* ── Auth ── */
+#auth-screen { background: white; border-radius: 12px; padding: 40px; width: 360px; box-shadow: 0 4px 20px rgba(0,0,0,.1); }
+#auth-screen h1 { color: #0084ff; font-size: 28px; text-align: center; margin-bottom: 8px; }
+#auth-screen .subtitle { color: #888; text-align: center; margin-bottom: 24px; font-size: 13px; }
+.form-group { margin-bottom: 14px; }
+.form-group label { display: block; font-size: 12px; color: #666; margin-bottom: 4px; }
+.form-group input { width: 100%; padding: 10px 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; outline: none; transition: border .2s; }
+.form-group input:focus { border-color: #0084ff; }
+.btn-row { display: flex; gap: 8px; margin-top: 8px; }
+button { padding: 10px 20px; border: none; border-radius: 8px; font-size: 14px; cursor: pointer; transition: background .15s; }
+.btn-primary { background: #0084ff; color: white; flex: 1; }
+.btn-primary:hover { background: #0070e0; }
+.btn-secondary { background: #f0f0f0; color: #333; flex: 1; }
+.btn-secondary:hover { background: #e0e0e0; }
+#auth-status { text-align: center; font-size: 12px; min-height: 18px; margin-top: 10px; }
+.err { color: #f44336; } .ok { color: #4caf50; }
+
+/* ── Main App ── */
+#app { display: none; width: 960px; height: 90vh; max-height: 700px; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,.12); flex-direction: row; }
+
+/* Sidebar */
+.sidebar { width: 260px; display: flex; flex-direction: column; border-right: 1px solid #e8e8e8; flex-shrink: 0; }
+.sidebar-header { background: #0084ff; padding: 14px 16px; color: white; display: flex; align-items: center; gap: 8px; }
+.sidebar-header .username { font-weight: bold; font-size: 14px; flex: 1; }
+.sidebar-actions { display: flex; gap: 4px; }
+.icon-btn { background: transparent; border: none; color: white; font-size: 18px; cursor: pointer; padding: 4px 6px; border-radius: 4px; }
+.icon-btn:hover { background: rgba(255,255,255,.2); }
+.status-bar { padding: 4px 12px; font-size: 11px; color: #888; background: #fafafa; border-bottom: 1px solid #eee; }
+.conv-list { flex: 1; overflow-y: auto; }
+.conv-item { display: flex; align-items: center; gap: 10px; padding: 10px 14px; cursor: pointer; transition: background .1s; }
+.conv-item:hover { background: #f5f5f5; }
+.conv-item.active { background: #e8f4ff; }
+.avatar { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: bold; color: white; flex-shrink: 0; }
+.conv-info { flex: 1; min-width: 0; }
+.conv-name { font-size: 13px; font-weight: 600; color: #222; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.conv-preview { font-size: 11px; color: #888; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
+.badge { background: #f44336; color: white; border-radius: 10px; padding: 1px 6px; font-size: 11px; font-weight: bold; flex-shrink: 0; }
+
+/* Chat area */
+.chat-area { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.chat-header { padding: 14px 20px; border-bottom: 1px solid #eee; font-size: 16px; font-weight: bold; color: #222; }
+.messages { flex: 1; overflow-y: auto; padding: 16px 20px; display: flex; flex-direction: column; gap: 8px; background: #fafafa; }
+.msg-row { display: flex; flex-direction: column; max-width: 70%; }
+.msg-row.mine { align-self: flex-end; align-items: flex-end; }
+.msg-row.theirs { align-self: flex-start; align-items: flex-start; }
+.msg-sender { font-size: 11px; color: #888; margin-bottom: 3px; }
+.bubble { padding: 9px 14px; border-radius: 14px; font-size: 13px; line-height: 1.5; word-break: break-word; }
+.mine .bubble { background: #0084ff; color: white; }
+.theirs .bubble { background: #f0f0f0; color: #333; }
+.msg-time { font-size: 10px; color: #bbb; margin-top: 3px; }
+.input-area { padding: 12px 16px; border-top: 1px solid #eee; display: flex; gap: 10px; align-items: flex-end; background: white; }
+#msg-input { flex: 1; border: 1px solid #ddd; border-radius: 10px; padding: 10px 14px; font-size: 13px; outline: none; resize: none; max-height: 100px; font-family: inherit; }
+#msg-input:focus { border-color: #0084ff; }
+.send-btn { background: #0084ff; color: white; border: none; border-radius: 8px; padding: 10px 18px; font-size: 13px; cursor: pointer; white-space: nowrap; }
+.send-btn:hover { background: #0070e0; }
+.placeholder { flex: 1; display: flex; align-items: center; justify-content: center; color: #bbb; font-size: 14px; flex-direction: column; gap: 8px; }
+.placeholder-icon { font-size: 48px; }
+
+/* Modal */
+.modal-bg { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.4); z-index: 100; align-items: center; justify-content: center; }
+.modal-bg.open { display: flex; }
+.modal { background: white; border-radius: 12px; padding: 28px; width: 320px; }
+.modal h3 { margin-bottom: 16px; font-size: 16px; }
+.modal input { width: 100%; padding: 9px 12px; border: 1px solid #ddd; border-radius: 8px; margin-bottom: 12px; font-size: 13px; outline: none; }
+.modal input:focus { border-color: #0084ff; }
+.modal .btn-row { justify-content: flex-end; }
+.modal .btn-row button { flex: 0; }
+
+@media (max-width: 700px) {
+  #app { width: 100vw; height: 100vh; border-radius: 0; }
+  .sidebar { width: 220px; }
+}
+</style>
+</head>
+<body>
+
+<!-- ── Auth Screen ── -->
+<div id="auth-screen">
+  <h1>💬 LiteChat</h1>
+  <p class="subtitle">轻量、安全、本地存储</p>
+  <div class="form-group">
+    <label>服务器地址</label>
+    <input id="server-url" value="ws://localhost:8080" placeholder="ws://your-server:8080">
+  </div>
+  <div class="form-group">
+    <label>用户名</label>
+    <input id="auth-username" placeholder="3-32位字母/数字/_">
+  </div>
+  <div class="form-group">
+    <label>密码</label>
+    <input id="auth-password" type="password" placeholder="最少6位">
+  </div>
+  <div class="btn-row">
+    <button class="btn-primary" onclick="doLogin()">登录</button>
+    <button class="btn-secondary" onclick="doRegister()">注册</button>
+  </div>
+  <div id="auth-status"></div>
+</div>
+
+<!-- ── Main App ── -->
+<div id="app" style="display:none">
+  <div class="sidebar">
+    <div class="sidebar-header">
+      <span class="username" id="my-username-label">👤</span>
+      <div class="sidebar-actions">
+        <button class="icon-btn" onclick="openNewChat()" title="新建对话">💬</button>
+        <button class="icon-btn" onclick="openGroupMenu()" title="群组">👥</button>
+        <button class="icon-btn" onclick="logout()" title="退出">🚪</button>
+      </div>
+    </div>
+    <div class="status-bar" id="status-bar">⚪ 连接中...</div>
+    <div class="conv-list" id="conv-list"></div>
+  </div>
+  <div class="chat-area" id="chat-area">
+    <div class="placeholder">
+      <div class="placeholder-icon">💬</div>
+      <div>选择一个对话开始聊天</div>
+    </div>
+  </div>
+</div>
+
+<!-- ── New Chat Modal ── -->
+<div class="modal-bg" id="new-chat-modal">
+  <div class="modal">
+    <h3>新建对话</h3>
+    <input id="new-chat-target" placeholder="输入对方用户名">
+    <div class="btn-row">
+      <button class="btn-secondary" onclick="closeModal('new-chat-modal')">取消</button>
+      <button class="btn-primary" onclick="startNewChat()">开始</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Group Modal ── -->
+<div class="modal-bg" id="group-modal">
+  <div class="modal">
+    <h3>群组操作</h3>
+    <div class="btn-row" style="flex-direction:column; gap:8px">
+      <button class="btn-primary" onclick="createGroup()">🆕 创建群组</button>
+      <button class="btn-secondary" onclick="joinGroup()">🔗 加入群组 (输入ID)</button>
+      <button class="btn-secondary" onclick="closeModal('group-modal')">取消</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── 本地存储 (localStorage for web) ──────────────────────
+const DB_KEY = 'litechat_db';
+
+function getDB() {
+  try { return JSON.parse(localStorage.getItem(DB_KEY) || '{}'); } catch { return {}; }
+}
+function saveDB(db) {
+  localStorage.setItem(DB_KEY, JSON.stringify(db));
+}
+function getConversations() {
+  const db = getDB();
+  const convs = db.conversations || {};
+  return Object.values(convs).sort((a, b) => (b.lastTime || 0) - (a.lastTime || 0));
+}
+function getMessages(convId, limit = 100) {
+  const db = getDB();
+  const msgs = (db.messages || {})[convId] || [];
+  return msgs.slice(-limit);
+}
+function saveMessage(convId, msg) {
+  const db = getDB();
+  if (!db.messages) db.messages = {};
+  if (!db.messages[convId]) db.messages[convId] = [];
+  
+  // 去重
+  if (!db.messages[convId].find(m => m.msg_id === msg.msg_id)) {
+    db.messages[convId].push(msg);
+    // 只保留最近500条
+    if (db.messages[convId].length > 500) db.messages[convId] = db.messages[convId].slice(-500);
+  }
+
+  if (!db.conversations) db.conversations = {};
+  const existing = db.conversations[convId] || { convId, name: convId, isGroup: msg.isGroup || false, unread: 0 };
+  db.conversations[convId] = {
+    ...existing,
+    lastMsg: msg.content.substring(0, 60),
+    lastTime: msg.timestamp,
+    unread: (existing.unread || 0) + (msg.fromUser !== state.username ? 1 : 0)
+  };
+  saveDB(db);
+}
+function ensureConv(convId, name, isGroup = false) {
+  const db = getDB();
+  if (!db.conversations) db.conversations = {};
+  if (!db.conversations[convId]) {
+    db.conversations[convId] = { convId, name: name || convId, isGroup, lastMsg: '', lastTime: 0, unread: 0 };
+    saveDB(db);
+  }
+}
+function markRead(convId) {
+  const db = getDB();
+  if (db.conversations && db.conversations[convId]) {
+    db.conversations[convId].unread = 0;
+    saveDB(db);
+  }
+}
+
+// ── State ────────────────────────────────────────────────
+const state = {
+  username: null,
+  token: null,
+  serverUrl: null,
+  httpUrl: null,
+  ws: null,
+  currentConv: null,
+  reconnectTimer: null,
+  reconnectDelay: 2000,
+};
+
+// ── HTTP Helpers ─────────────────────────────────────────
+async function apiFetch(path, method, body, auth = false) {
+  const opts = {
+    method,
+    headers: { 'Content-Type': 'application/json' },
+  };
+  if (auth) opts.headers['Authorization'] = `Bearer ${state.token}`;
+  if (body) opts.body = JSON.stringify(body);
+  const r = await fetch(state.httpUrl + path, opts);
+  return r;
+}
+
+// ── Auth ─────────────────────────────────────────────────
+function setStatus(msg, cls = '') {
+  const el = document.getElementById('auth-status');
+  el.textContent = msg;
+  el.className = cls;
+}
+
+async function doRegister() {
+  const username = document.getElementById('auth-username').value.trim();
+  const password = document.getElementById('auth-password').value;
+  const server = document.getElementById('server-url').value.trim();
+  state.httpUrl = server.replace('ws://', 'http://').replace('wss://', 'https://');
+  try {
+    const r = await apiFetch('/api/register', 'POST', { username, password });
+    const data = await r.json();
+    if (r.ok) setStatus('注册成功，请登录', 'ok');
+    else setStatus(data.error || '注册失败', 'err');
+  } catch (e) { setStatus('连接失败: ' + e.message, 'err'); }
+}
+
+async function doLogin() {
+  const username = document.getElementById('auth-username').value.trim();
+  const password = document.getElementById('auth-password').value;
+  const server = document.getElementById('server-url').value.trim();
+  state.httpUrl = server.replace('ws://', 'http://').replace('wss://', 'https://');
+  state.serverUrl = server;
+  try {
+    const r = await apiFetch('/api/login', 'POST', { username, password });
+    const data = await r.json();
+    if (r.ok) {
+      state.token = data.token;
+      state.username = data.username;
+      localStorage.setItem('litechat_auth', JSON.stringify({ token: data.token, username: data.username, server }));
+      showApp();
+    } else {
+      setStatus(data.error || '登录失败', 'err');
+    }
+  } catch (e) { setStatus('连接失败: ' + e.message, 'err'); }
+}
+
+function logout() {
+  if (state.ws) state.ws.close();
+  localStorage.removeItem('litechat_auth');
+  location.reload();
+}
+
+function showApp() {
+  document.getElementById('auth-screen').style.display = 'none';
+  const app = document.getElementById('app');
+  app.style.display = 'flex';
+  document.getElementById('my-username-label').textContent = '👤 ' + state.username;
+  renderConvList();
+  connectWS();
+}
+
+// ── WebSocket ────────────────────────────────────────────
+function connectWS() {
+  if (state.ws) state.ws.close();
+  setStatusBar('⚪ 连接中...');
+  
+  const wsUrl = state.serverUrl.startsWith('ws') ? state.serverUrl : 'ws://' + state.serverUrl;
+  state.ws = new WebSocket(wsUrl);
+
+  state.ws.onopen = () => {
+    state.reconnectDelay = 2000;
+    setStatusBar('🟡 认证中...');
+    state.ws.send(JSON.stringify({ type: 'auth', token: state.token }));
+  };
+
+  state.ws.onmessage = (e) => {
+    try { handleMessage(JSON.parse(e.data)); } catch {}
+  };
+
+  state.ws.onclose = () => {
+    setStatusBar('🔴 已断开，重连中...');
+    state.reconnectTimer = setTimeout(() => {
+      state.reconnectDelay = Math.min(state.reconnectDelay * 2, 30000);
+      connectWS();
+    }, state.reconnectDelay);
+  };
+
+  state.ws.onerror = () => setStatusBar('🔴 连接错误');
+}
+
+function wsSend(data) {
+  if (state.ws && state.ws.readyState === WebSocket.OPEN) {
+    state.ws.send(JSON.stringify(data));
+  }
+}
+
+function handleMessage(msg) {
+  if (msg.type === 'auth_ok') {
+    setStatusBar('🟢 在线');
+  } else if (msg.type === 'offline_msgs') {
+    msg.messages.forEach(m => handleMessage(m));
+  } else if (msg.type === 'chat') {
+    const convId = msg.from;
+    const msgObj = { msg_id: msg.msg_id, fromUser: msg.from, content: msg.content, timestamp: msg.timestamp, isGroup: false };
+    saveMessage(convId, msgObj);
+    renderConvList();
+    if (state.currentConv === convId) appendMessage(msgObj);
+    else notifyUnread(convId);
+  } else if (msg.type === 'group_chat') {
+    const convId = msg.group_id;
+    const msgObj = { msg_id: msg.msg_id, fromUser: msg.from, content: msg.content, timestamp: msg.timestamp, isGroup: true, groupId: convId };
+    saveMessage(convId, msgObj);
+    renderConvList();
+    if (state.currentConv === convId) appendMessage(msgObj);
+    else notifyUnread(convId);
+  } else if (msg.type === 'ack') {
+    // 消息已送达服务器
+  } else if (msg.type === 'user_online') {
+    // TODO: show online indicator
+  }
+}
+
+// ── UI ───────────────────────────────────────────────────
+function setStatusBar(text) {
+  document.getElementById('status-bar').textContent = text;
+}
+
+function stringToColor(str) {
+  let hash = 0;
+  for (let c of str) hash = (hash << 5) - hash + c.charCodeAt(0);
+  return '#' + ((hash >>> 0) % 0xFFFFFF).toString(16).padStart(6, '0');
+}
+
+function renderConvList() {
+  const list = document.getElementById('conv-list');
+  const convs = getConversations();
+  list.innerHTML = '';
+  convs.forEach(conv => {
+    const el = document.createElement('div');
+    el.className = 'conv-item' + (state.currentConv === conv.convId ? ' active' : '');
+    const color = stringToColor(conv.convId);
+    const initial = ((conv.name || conv.convId)[0] || '?').toUpperCase();
+    el.innerHTML = `
+      <div class="avatar" style="background:${color}">${initial}</div>
+      <div class="conv-info">
+        <div class="conv-name">${escHtml(conv.name || conv.convId)}</div>
+        <div class="conv-preview">${escHtml(conv.lastMsg || '')}</div>
+      </div>
+      ${conv.unread > 0 ? `<div class="badge">${conv.unread}</div>` : ''}
+    `;
+    el.onclick = () => openConv(conv.convId, conv.name, conv.isGroup);
+    list.appendChild(el);
+  });
+}
+
+function openConv(convId, name, isGroup) {
+  state.currentConv = convId;
+  markRead(convId);
+  renderConvList();
+
+  const area = document.getElementById('chat-area');
+  area.innerHTML = `
+    <div class="chat-header">${isGroup ? '🏷 ' : '💬 '}${escHtml(name || convId)}</div>
+    <div class="messages" id="messages"></div>
+    <div class="input-area">
+      <textarea id="msg-input" placeholder="输入消息... (Enter发送, Shift+Enter换行)" rows="1"></textarea>
+      <button class="send-btn" onclick="doSend()">发送</button>
+    </div>
+  `;
+  document.getElementById('msg-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); doSend(); }
+  });
+
+  const msgs = getMessages(convId);
+  const container = document.getElementById('messages');
+  msgs.forEach(m => appendMessage(m, false));
+  container.scrollTop = container.scrollHeight;
+}
+
+function appendMessage(msg, scroll = true) {
+  const container = document.getElementById('messages');
+  if (!container) return;
+
+  const isMine = msg.fromUser === state.username;
+  const ts = msg.timestamp > 1e12 ? msg.timestamp / 1000 : msg.timestamp;
+  const timeStr = new Date(ts * 1000).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+
+  const row = document.createElement('div');
+  row.className = 'msg-row ' + (isMine ? 'mine' : 'theirs');
+  row.innerHTML = `
+    ${(!isMine && msg.isGroup) ? `<div class="msg-sender">${escHtml(msg.fromUser)}</div>` : ''}
+    <div class="bubble">${escHtml(msg.content)}</div>
+    <div class="msg-time">${timeStr}</div>
+  `;
+  container.appendChild(row);
+  if (scroll) container.scrollTop = container.scrollHeight;
+}
+
+function doSend() {
+  const input = document.getElementById('msg-input');
+  if (!input || !state.currentConv) return;
+  const content = input.value.trim();
+  if (!content) return;
+  input.value = '';
+
+  const db = getDB();
+  const conv = (db.conversations || {})[state.currentConv];
+  const isGroup = conv && conv.isGroup;
+
+  const msgId = crypto.randomUUID();
+  const ts = Date.now();
+
+  const msgObj = { msg_id: msgId, fromUser: state.username, content, timestamp: ts, isGroup };
+
+  if (isGroup) {
+    wsSend({ type: 'group_chat', group_id: state.currentConv, content, msg_id: msgId, timestamp: ts });
+  } else {
+    wsSend({ type: 'chat', to: state.currentConv, content, msg_id: msgId, timestamp: ts });
+  }
+
+  saveMessage(state.currentConv, msgObj);
+  renderConvList();
+  appendMessage(msgObj);
+}
+
+function notifyUnread(convId) {
+  // 可以在这里添加桌面通知
+  if ('Notification' in window && Notification.permission === 'granted') {
+    const db = getDB();
+    const conv = (db.conversations || {})[convId];
+    new Notification('LiteChat', { body: `${conv?.name || convId} 发来消息`, icon: '/favicon.ico' });
+  }
+}
+
+// ── Modals ───────────────────────────────────────────────
+function openNewChat() { document.getElementById('new-chat-modal').classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+function openGroupMenu() { document.getElementById('group-modal').classList.add('open'); }
+
+function startNewChat() {
+  const target = document.getElementById('new-chat-target').value.trim();
+  if (!target || target === state.username) return;
+  ensureConv(target, target, false);
+  renderConvList();
+  openConv(target, target, false);
+  closeModal('new-chat-modal');
+  document.getElementById('new-chat-target').value = '';
+}
+
+async function createGroup() {
+  closeModal('group-modal');
+  const name = prompt('群组名称:');
+  if (!name || !name.trim()) return;
+  try {
+    const r = await apiFetch('/api/group/create', 'POST', { name: name.trim() }, true);
+    const data = await r.json();
+    if (r.ok) {
+      ensureConv(data.group_id, name.trim(), true);
+      renderConvList();
+      alert(`群组创建成功！\n群组ID: ${data.group_id}\n分享此ID给其他人加入`);
+    } else alert(data.error || '创建失败');
+  } catch (e) { alert('错误: ' + e.message); }
+}
+
+async function joinGroup() {
+  closeModal('group-modal');
+  const gid = prompt('输入群组ID:');
+  if (!gid || !gid.trim()) return;
+  try {
+    const r = await apiFetch('/api/group/join', 'POST', { group_id: gid.trim() }, true);
+    const data = await r.json();
+    if (r.ok) {
+      ensureConv(gid.trim(), data.name || gid.trim(), true);
+      renderConvList();
+      alert(`已加入群组: ${data.name}`);
+    } else alert(data.error || '加入失败');
+  } catch (e) { alert('错误: ' + e.message); }
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── Init ─────────────────────────────────────────────────
+window.onload = () => {
+  // 请求通知权限
+  if ('Notification' in window) Notification.requestPermission();
+
+  // 自动登录
+  try {
+    const saved = JSON.parse(localStorage.getItem('litechat_auth') || '{}');
+    if (saved.token && saved.username) {
+      state.token = saved.token;
+      state.username = saved.username;
+      state.serverUrl = saved.server || document.getElementById('server-url').value;
+      state.httpUrl = state.serverUrl.replace('ws://', 'http://').replace('wss://', 'https://');
+      showApp();
+    }
+  } catch {}
+};
+</script>
+</body>
+</html>
