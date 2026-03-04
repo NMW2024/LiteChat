@@ -1,1 +1,1 @@
-FROM Server/Dockerfile
+FROM server/Dockerfile
