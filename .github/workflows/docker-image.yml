@@ -15,4 +15,4 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - name: Build the Docker image
-      run: docker build -f Server/Dockerfile -t my-image-name:$(date +%s) ./Server
+      run: docker build -f Server/Dockerfile -t litechat:$(date +%s) ./Server
