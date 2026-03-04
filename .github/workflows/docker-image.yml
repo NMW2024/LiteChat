@@ -1,0 +1,23 @@
+name: Docker Image CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: Build the Docker image
+      run: IMAGE_NAME="${{ secrets.DOCKERHUB_USERNAME }}/litechat"
+           TAG="${{ github.sha }}" 
+           docker build -f Server/Dockerfile -t $IMAGE_NAME:$TAG ./Server
+           docker tag $IMAGE_NAME:$TAG $IMAGE_NAME:latest  
+           docker push $IMAGE_NAME:$TAG
+           docker push $IMAGE_NAME:latest 
